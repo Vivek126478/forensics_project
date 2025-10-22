@@ -58,6 +58,13 @@ public class GameMenuActivity extends Activity {
         });
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh UI in case level state changed while away
+        updateLockStateUI();
+    }
+
     private void updateLockStateUI() {
         StringBuilder sb = new StringBuilder();
         sb.append(getString(R.string.level_status_prefix))
@@ -65,8 +72,9 @@ public class GameMenuActivity extends Activity {
           .append(LevelManager.getCurrentLevel(this));
         statusTextView.setText(sb.toString());
 
-        centipedeButton.setEnabled(LevelManager.isCentipedeUnlocked(this));
-        asteroidButton.setEnabled(LevelManager.isAsteroidUnlocked(this));
+        // Keep buttons enabled; click handlers enforce lock rules and show messages
+        centipedeButton.setEnabled(true);
+        asteroidButton.setEnabled(true);
     }
 }
 
