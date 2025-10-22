@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">forensics_project</string>
     <string name="level_status_prefix">Level:</string>
+    <string name="all_games_unlocked">All games unlocked</string>
     <string name="centipede_locked">Centipede is locked. Reach level 3.</string>
     <string name="asteroid_locked">Asteroid Attack is locked. Reach level 2.</string>
 </resources>
