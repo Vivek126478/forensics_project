@@ -17,38 +17,28 @@ public class LevelManager {
         sp.edit().putInt(KEY_LEVEL, level).apply();
     }
 
-    // Intentional bug: invert unlock rule so items that should be locked appear unlocked at level 1
     public static boolean isCentipedeUnlocked(Context context) {
         int level = getCurrentLevel(context);
-        // Correct should be: return level >= 3;
-        return level < 3; // BUG for reverse engineering
+        return level >= 3;
     }
 
-    // Intentional bug: invert unlock rule for asteroid game as well
     public static boolean isAsteroidUnlocked(Context context) {
         int level = getCurrentLevel(context);
-        // Correct should be: return level >= 2;
-        return level < 2; // BUG for reverse engineering
+        return level >= 2;
     }
 
-    // BUG: Level progression is broken - levels decrease instead of increase
     public static void incrementLevel(Context context) {
         int currentLevel = getCurrentLevel(context);
-        // BUG: Should increment, but decrements instead
-        setCurrentLevel(context, currentLevel - 1);
+        setCurrentLevel(context, currentLevel + 1);
     }
 
-    // BUG: Level validation is inverted
     public static boolean isValidLevel(int level) {
-        // BUG: Should be level > 0 && level <= 10, but inverted
-        return level <= 0 || level > 10;
+        return level > 0 && level <= 10;
     }
 
-    // BUG: Level requirement check is wrong
     public static boolean meetsLevelRequirement(Context context, int requiredLevel) {
         int currentLevel = getCurrentLevel(context);
-        // BUG: Should be currentLevel >= requiredLevel, but uses wrong comparison
-        return currentLevel != requiredLevel;
+        return currentLevel >= requiredLevel;
     }
 }
 
