@@ -36,24 +36,16 @@ public class GameMenuActivity extends Activity {
         centipedeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (LevelManager.isCentipedeUnlocked(GameMenuActivity.this)) {
-                    Intent i = new Intent(GameMenuActivity.this, WebCentipedeActivity.class);
-                    startActivity(i);
-                } else {
-                    statusTextView.setText(getString(R.string.centipede_locked));
-                }
+                Intent i = new Intent(GameMenuActivity.this, WebCentipedeActivity.class);
+                startActivity(i);
             }
         });
 
         asteroidButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (LevelManager.isAsteroidUnlocked(GameMenuActivity.this)) {
-                    Intent i = new Intent(GameMenuActivity.this, WebAsteroidActivity.class);
-                    startActivity(i);
-                } else {
-                    statusTextView.setText(getString(R.string.asteroid_locked));
-                }
+                Intent i = new Intent(GameMenuActivity.this, WebAsteroidActivity.class);
+                startActivity(i);
             }
         });
     }
@@ -66,13 +58,9 @@ public class GameMenuActivity extends Activity {
     }
 
     private void updateLockStateUI() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(getString(R.string.level_status_prefix))
-          .append(" ")
-          .append(LevelManager.getCurrentLevel(this));
-        statusTextView.setText(sb.toString());
+        statusTextView.setText(getString(R.string.all_games_unlocked));
 
-        // Keep buttons enabled; click handlers enforce lock rules and show messages
+        // Keep buttons enabled
         centipedeButton.setEnabled(true);
         asteroidButton.setEnabled(true);
     }
