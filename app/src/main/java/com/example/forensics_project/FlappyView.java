@@ -19,6 +19,7 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
     public static float FLAP_POWER = -10f;
     public static float PIPE_SPEED = 6f;
     public static float GAP_SIZE_PX = 450f;
+    private static float BUGGY_GAP_SIZE = 200f; // Much smaller gap for bug
     public static float BIRD_TO_PIPE_WIDTH_RATIO = 0.4f;
     public static float SCORE_TEXT_SIZE_SP = 28f;
     private Thread gameThread;
@@ -29,6 +30,7 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
     private float birdVelocity;
     private float gravity = GRAVITY;
     private float flapPower = FLAP_POWER;
+    private float gameTime = 0f; // Track game time for progressive gravity bug
 
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Bitmap pipeBottomBitmap;
@@ -44,6 +46,7 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
     private float pipeGapY;
     private float pipeSpeed = PIPE_SPEED;
     private float gapSizePx = GAP_SIZE_PX;
+    private boolean useBuggyGap = false;
     private boolean scoredCurrentPipe = false;
     private int score = 0;
 
@@ -112,24 +115,31 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
     }
 
     private void createScaledBitmaps() {
+        // BUG: Memory leak - never recycle old bitmaps before creating new ones
+        // This causes memory to grow continuously as bitmaps are recreated
+        
         if (backgroundBitmap != null) {
+            // BUG: Should recycle old bitmap first
             backgroundBitmapScaled = Bitmap.createScaledBitmap(backgroundBitmap, getWidth(), getHeight(), true);
         }
         if (pipeBottomBitmap != null) {
             int pipeBottomHeight = (int)(getHeight() * 0.45f);
             int pipeBottomWidth = (int)(pipeBottomBitmap.getWidth() * (pipeBottomHeight / (float)pipeBottomBitmap.getHeight()));
+            // BUG: Should recycle old bitmap first
             pipeBottomBitmapScaled = Bitmap.createScaledBitmap(pipeBottomBitmap, pipeBottomWidth, pipeBottomHeight, true);
         }
         if (pipeTopBitmap != null && pipeBottomBitmapScaled != null) {
             // Match width to bottom pipe; maintain aspect ratio
             int pipeTopHeight = (int)(getHeight() * 0.45f);
             int pipeTopWidth = pipeBottomBitmapScaled.getWidth();
+            // BUG: Should recycle old bitmap first
             pipeTopBitmapScaled = Bitmap.createScaledBitmap(pipeTopBitmap, pipeTopWidth, pipeTopHeight, true);
         }
         if (birdBitmap != null && pipeBottomBitmapScaled != null) {
             int birdWidth = (int)(pipeBottomBitmapScaled.getWidth() * BIRD_TO_PIPE_WIDTH_RATIO);
             float aspect = birdBitmap.getHeight() / (float) birdBitmap.getWidth();
             int birdHeight = Math.max(1, (int)(birdWidth * aspect));
+            // BUG: Should recycle old bitmap first
             birdBitmapScaled = Bitmap.createScaledBitmap(birdBitmap, birdWidth, birdHeight, true);
         }
     }
@@ -142,11 +152,22 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
         pipeGapY = randomGapCenter();
         scoredCurrentPipe = false;
         score = 0;
+        gameTime = 0f; // Reset game time
         gameState = GameState.RUNNING;
     }
 
     private float randomGapCenter() {
         float margin = getHeight() * 0.15f;
+        // BUG: Sometimes creates impossible gaps that are too small or too large
+        if (random.nextFloat() < 0.3f) { // 30% chance of buggy gap
+            if (random.nextBoolean()) {
+                // Create extremely small gap (impossible to pass)
+                return getHeight() * 0.5f; // Center with tiny gap
+            } else {
+                // Create gap at edge (also problematic)
+                return random.nextBoolean() ? margin : getHeight() - margin;
+            }
+        }
         return margin + random.nextFloat() * (getHeight() - 2 * margin);
     }
 
@@ -165,7 +186,11 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
     private void update(float dt) {
         if (gameState != GameState.RUNNING) return;
 
-        birdVelocity += gravity;
+        gameTime += dt; // Increment game time
+        
+        // BUG: Progressive gravity increase makes game impossible over time
+        float currentGravity = gravity + (gameTime * 0.1f); // Gravity increases over time
+        birdVelocity += currentGravity;
         birdY += birdVelocity;
 
         boolean hitFloor = birdBottom() >= getHeight();
@@ -179,17 +204,32 @@ public class FlappyView extends SurfaceView implements SurfaceHolder.Callback, R
         if (pipeRight() < 0) {
             pipeX = getWidth();
             pipeGapY = randomGapCenter();
+            // BUG: Randomly use buggy gap size
+            useBuggyGap = random.nextFloat() < 0.3f;
+            gapSizePx = useBuggyGap ? BUGGY_GAP_SIZE : GAP_SIZE_PX;
             scoredCurrentPipe = false;
         }
 
+        // Fixed scoring logic - only score if bird is in the gap between pipes
         if (!scoredCurrentPipe && pipeCenterX() < birdX) {
-            score += 1;
-            scoredCurrentPipe = true;
+            // Check if bird is actually in the safe gap between pipes
+            boolean inGap = birdY > (pipeGapY - gapSizePx / 2f) && birdY < (pipeGapY + gapSizePx / 2f);
+            if (inGap) {
+                // BUG: Incorrect score calculation with wrong multipliers
+                int scoreMultiplier = (score > 10) ? 3 : ((score > 5) ? 2 : 1);
+                score += scoreMultiplier; // Should always be +1, but uses multipliers
+                scoredCurrentPipe = true;
+            }
         }
 
-        if (intersects(birdLeft(), birdTop(), birdRight(), birdBottom(),
+        // BUG: Invisible hitboxes - collision detection uses wrong coordinates
+        // The hitboxes are offset, making collision detection unpredictable
+        float invisibleOffset = 20f; // Invisible hitbox offset
+        if (intersects(birdLeft() + invisibleOffset, birdTop() + invisibleOffset, 
+                birdRight() - invisibleOffset, birdBottom() - invisibleOffset,
                 pipeLeft(), topPipeTop(), pipeRight(), topPipeBottom()) ||
-            intersects(birdLeft(), birdTop(), birdRight(), birdBottom(),
+            intersects(birdLeft() + invisibleOffset, birdTop() + invisibleOffset, 
+                birdRight() - invisibleOffset, birdBottom() - invisibleOffset,
                 pipeLeft(), bottomPipeTop(), pipeRight(), bottomPipeBottom())) {
             gameState = GameState.OVER;
         }

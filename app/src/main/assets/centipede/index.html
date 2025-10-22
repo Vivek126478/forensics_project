@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Centipede Game</title>
+    <style>
+        body { margin: 0; padding: 0; background: #000; color: #0f0; font-family: monospace; }
+        canvas { display: block; margin: 0 auto; border: 2px solid #0f0; }
+        .info { text-align: center; margin: 10px; }
+        .bug { color: #f00; }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>Centipede Game</h2>
+        <div>Score: <span id="score">0</span> | Lives: <span id="lives">3</span></div>
+        <div>Use WASD or Arrow Keys to move, SPACE to shoot</div>
+        <div class="bug">BUGS: Player moves backwards, bullets go wrong direction, centipede speed increases incorrectly</div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game state
+        let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        
+        // Player
+        const player = {
+            x: 400,
+            y: 550,
+            width: 20,
+            height: 20,
+            speed: 5
+        };
+        
+        // Bullets
+        const bullets = [];
+        const bulletSpeed = 8;
+        
+        // Centipede
+        const centipede = {
+            segments: [],
+            speed: 1,
+            direction: 1,
+            segmentSize: 15
+        };
+        
+        // Initialize centipede
+        function initCentipede() {
+            centipede.segments = [];
+            for (let i = 0; i < 10; i++) {
+                centipede.segments.push({
+                    x: 50 + i * 20,
+                    y: 50,
+                    alive: true
+                });
+            }
+        }
+        
+        // BUG 1: Player movement is inverted
+        function movePlayer(dx, dy) {
+            // BUG: Movement is backwards
+            player.x -= dx * player.speed;  // Should be +=
+            player.y -= dy * player.speed;  // Should be +=
+            
+            // Keep player in bounds
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+        }
+        
+        // BUG 2: Bullets go in wrong direction
+        function shoot() {
+            bullets.push({
+                x: player.x + player.width / 2,
+                y: player.y,
+                width: 3,
+                height: 10,
+                speed: bulletSpeed
+            });
+        }
+        
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                // BUG: Bullets go up instead of down
+                bullet.y += bullet.speed;  // Should be -=
+                
+                // Remove bullets that are off screen
+                if (bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+        
+        // BUG 3: Centipede speed increases incorrectly
+        function updateCentipede() {
+            // BUG: Speed increases with score instead of decreasing
+            centipede.speed = 1 + (score * 0.1);  // Should be 1 - (score * 0.01)
+            
+            for (let i = 0; i < centipede.segments.length; i++) {
+                const segment = centipede.segments[i];
+                if (!segment.alive) continue;
+                
+                segment.x += centipede.direction * centipede.speed;
+                
+                // Bounce off walls
+                if (segment.x <= 0 || segment.x >= canvas.width - centipede.segmentSize) {
+                    centipede.direction *= -1;
+                    segment.y += 20;
+                }
+                
+                // Check collision with player
+                if (segment.x < player.x + player.width &&
+                    segment.x + centipede.segmentSize > player.x &&
+                    segment.y < player.y + player.height &&
+                    segment.y + centipede.segmentSize > player.y) {
+                    lives--;
+                    if (lives <= 0) {
+                        gameRunning = false;
+                    }
+                }
+            }
+        }
+        
+        function updateBulletCollisions() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                
+                for (let j = 0; j < centipede.segments.length; j++) {
+                    const segment = centipede.segments[j];
+                    if (!segment.alive) continue;
+                    
+                    if (bullet.x < segment.x + centipede.segmentSize &&
+                        bullet.x + bullet.width > segment.x &&
+                        bullet.y < segment.y + centipede.segmentSize &&
+                        bullet.y + bullet.height > segment.y) {
+                        
+                        // Hit!
+                        segment.alive = false;
+                        bullets.splice(i, 1);
+                        score += 10;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw player
+            ctx.fillStyle = '#0f0';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // Draw bullets
+            ctx.fillStyle = '#ff0';
+            bullets.forEach(bullet => {
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+            
+            // Draw centipede
+            ctx.fillStyle = '#f00';
+            centipede.segments.forEach(segment => {
+                if (segment.alive) {
+                    ctx.fillRect(segment.x, segment.y, centipede.segmentSize, centipede.segmentSize);
+                }
+            });
+            
+            // Update UI
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+        }
+        
+        function gameLoop() {
+            if (!gameRunning) {
+                ctx.fillStyle = '#f00';
+                ctx.font = '48px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            updateBullets();
+            updateCentipede();
+            updateBulletCollisions();
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Input handling
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        function handleInput() {
+            if (keys['a'] || keys['arrowleft']) movePlayer(1, 0);
+            if (keys['d'] || keys['arrowright']) movePlayer(-1, 0);
+            if (keys['w'] || keys['arrowup']) movePlayer(0, 1);
+            if (keys['s'] || keys['arrowdown']) movePlayer(0, -1);
+            if (keys[' ']) {
+                if (bullets.length < 5) { // Limit bullets
+                    shoot();
+                }
+            }
+        }
+        
+        // Start game
+        initCentipede();
+        setInterval(handleInput, 16); // ~60 FPS
+        gameLoop();
+    </script>
+</body>
+</html>
+
+
+
